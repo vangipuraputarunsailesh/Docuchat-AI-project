@@ -1,0 +1,24 @@
+# 🔒 Sensitive files
+.env
+.env.*
+
+# 🧠 Python cache / build folders
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# 🧩 Virtual environment
+.venv/
+venv/
+env/
+*.egg-info/
+
+# 🧰 System files
+.DS_Store
+Thumbs.db
+
+# 🧾 IDE / VSCode files
+.vscode/
+.idea/

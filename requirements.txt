@@ -1,0 +1,13 @@
+streamlit==1.28.1
+langchain==0.1.17
+langchain-community==0.0.37
+langchain-openai==0.0.8
+chromadb==0.4.18
+openai>=1.10.0
+pypdf2==3.0.1
+beautifulsoup4==4.12.2
+requests==2.31.0
+python-dotenv==1.0.0
+tiktoken==0.5.2
+pandas==2.1.4
+numpy==1.24.3

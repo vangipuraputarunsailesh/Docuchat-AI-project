@@ -9,6 +9,10 @@ __pycache__/
 *.pyd
 *.sqlite3
 
+# 🗄️ Local vector DB and runtime artifacts
+chroma_db/
+chat_memory.json
+
 # 🧩 Virtual environment
 .venv/
 venv/

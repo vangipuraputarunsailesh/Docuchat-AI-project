@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import tempfile
 from typing import List, Dict
+import uuid
 import pandas as pd
 from datetime import datetime
 
@@ -142,6 +143,14 @@ def initialize_session_state():
         st.session_state.chat_history = []
     if 'source_documents_cache' not in st.session_state:
         st.session_state.source_documents_cache = {}
+    if 'active_document' not in st.session_state:
+        st.session_state.active_document = None
+    if 'uploaded_file_stats' not in st.session_state:
+        # map filename -> {chunks: int, total_chars: int}
+        st.session_state.uploaded_file_stats = {}
+    if 'upload_map' not in st.session_state:
+        # map display name -> upload_id
+        st.session_state.upload_map = {}
 
 def display_chat_message(role: str, content: str, source_docs: List[Dict] = None):
     """Display chat messages with styling."""
@@ -187,16 +196,42 @@ def main():
             for uploaded_file in uploaded_files:
                 if uploaded_file not in st.session_state.uploaded_files:
                     st.session_state.uploaded_files.append(uploaded_file)
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp:
-                        tmp.write(uploaded_file.getvalue())
-                        tmp_path = tmp.name
+                    # Process uploaded bytes directly (no temp file)
+                    file_bytes = uploaded_file.getvalue()
+                    ext = os.path.splitext(uploaded_file.name)[1].lower()
+                    # create a stable upload id for this upload
+                    upload_id = f"{uuid.uuid4().hex}_{int(datetime.utcnow().timestamp())}"
                     with st.spinner(f"📄 Processing {uploaded_file.name}..."):
-                        docs = st.session_state.document_processor.process_file(tmp_path)
-                        if docs and st.session_state.vector_store.add_documents(docs):
-                            st.success(f"✅ {uploaded_file.name} added successfully!")
+                        if ext == '.pdf':
+                            docs = st.session_state.document_processor.process_pdf_bytes(file_bytes, filename=uploaded_file.name, upload_id=upload_id)
+                        elif ext in ['.txt', '.md']:
+                            docs = st.session_state.document_processor.process_text_bytes(file_bytes, filename=uploaded_file.name, upload_id=upload_id)
                         else:
-                            st.error(f"❌ Failed to process {uploaded_file.name}.")
-                    os.unlink(tmp_path)
+                            docs = []
+
+                        # Compute stats for the extracted docs
+                        chunk_count = len(docs)
+                        total_chars = sum(len((d.page_content or "").strip()) for d in docs)
+                        st.session_state.uploaded_file_stats[uploaded_file.name] = {
+                            "chunks": chunk_count,
+                            "total_chars": total_chars
+                        }
+
+                        MIN_EXTRACTED_CHARS = 50
+                        # remember mapping for UI selection even if extraction failed
+                        st.session_state.upload_map[uploaded_file.name] = upload_id
+
+                        if chunk_count == 0 or total_chars < MIN_EXTRACTED_CHARS:
+                            # Warn the user: likely scanned PDF or empty document
+                            st.warning(f"⚠️ {uploaded_file.name} does not contain extractable text (found {chunk_count} chunks, {total_chars} chars).\n"
+                                       "Try uploading a text/pdf with selectable text or run OCR on scanned PDFs.")
+                        else:
+                            if st.session_state.vector_store.add_documents(docs):
+                                st.success(f"✅ {uploaded_file.name} added successfully!")
+                                # Set the latest uploaded file as the active document scope (by upload_id)
+                                st.session_state.active_document = upload_id
+                            else:
+                                st.error(f"❌ Failed to process {uploaded_file.name}.")
 
         st.divider()
         info = st.session_state.vector_store.get_collection_info()
@@ -215,6 +250,41 @@ def main():
             st.success("Chat memory cleared.")
             st.rerun()
 
+        # Active document scoping
+        st.markdown('<div class="sidebar-header">📌 Active Document Scope</div>', unsafe_allow_html=True)
+        uploaded_names = [f.name for f in st.session_state.uploaded_files]
+        if uploaded_names:
+            # show user-friendly names but map selection to upload_id
+            sel = st.selectbox(
+                "Which document should I answer from?", 
+                ["All Documents"] + uploaded_names,
+                help="Select a specific document to get answers only from that document, or choose 'All Documents' to search across all uploaded files."
+            )
+            if sel == "All Documents":
+                st.session_state.active_document = None
+                st.info("🌐 Answering from ALL uploaded documents")
+            else:
+                st.session_state.active_document = st.session_state.upload_map.get(sel)
+                st.success(f"📄 Answering ONLY from: **{sel}**")
+        else:
+            st.info("No documents uploaded yet.")
+
+        # Show upload extraction status
+        st.markdown('<div class="sidebar-header">📊 Upload Status</div>', unsafe_allow_html=True)
+        if st.session_state.uploaded_file_stats:
+            good = [n for n, s in st.session_state.uploaded_file_stats.items() if s['total_chars'] >= 50]
+            bad = [n for n, s in st.session_state.uploaded_file_stats.items() if s['total_chars'] < 50]
+            if good:
+                st.success(f"Files with extractable text: {len(good)}")
+                for name in good:
+                    st.write(f"- {name} ({st.session_state.uploaded_file_stats[name]['chunks']} chunks)")
+            if bad:
+                st.warning(f"Files without extractable text: {len(bad)}")
+                for name in bad:
+                    st.write(f"- {name} (found {st.session_state.uploaded_file_stats[name]['total_chars']} chars)")
+        else:
+            st.write("No processing stats available yet.")
+
     # Chat Area
     st.markdown("### 💬 Chat with Your Knowledge Base")
     user_input = st.chat_input("Ask something about your uploaded data...")
@@ -227,7 +297,8 @@ def main():
         display_chat_message("user", user_input)
 
         with st.spinner("🤔 Thinking..."):
-            result = st.session_state.chat_system.chat(user_input)
+            # Pass active document as a source filter to scope retrieval
+            result = st.session_state.chat_system.chat(user_input, source_filter=st.session_state.active_document)
             if result["error"]:
                 st.error(result["error"])
             else:

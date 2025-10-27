@@ -14,6 +14,38 @@ An intelligent document processing and chat system that allows you to upload PDF
 
 ## 🚀 Quick Start
 
+### Option A: Run with Docker (recommended)
+
+Prerequisites:
+- Docker Desktop installed and running
+- An OpenAI API key (create a file named `.env` as shown below)
+
+1) Create `.env` from the example (do not commit `.env`)
+```
+copy .env.example .env
+# Edit .env and paste your key: OPENAI_API_KEY=sk-...
+```
+
+2) Build the image (from the project folder)
+```powershell
+docker build -t docuchat .
+```
+
+3) Create a local folder for persistent ChromaDB and run
+```powershell
+New-Item -ItemType Directory -Force .\chroma_db | Out-Null
+docker run --rm -p 8501:8501 --env-file .env -v "${PWD}\chroma_db:/app/chroma_db" --name docuchat docuchat
+```
+
+Open http://localhost:8501
+
+If port 8501 is busy, change only the left side: `-p 8502:8501` and open http://localhost:8502.
+
+To run in the background instead (detached):
+```powershell
+docker run -d -p 8501:8501 --env-file .env -v "${PWD}\chroma_db:/app/chroma_db" --name docuchat docuchat
+```
+
 ### Prerequisites
 
 - Python 3.8 or higher
@@ -33,15 +65,14 @@ An intelligent document processing and chat system that allows you to upload PDF
    pip install -r requirements.txt
    ```
 
-3. **Set up Azure OpenAI credentials**
-   - Copy `env_example.txt` to `.env`
-   - Fill in your Azure OpenAI credentials:
+3. **Set up OpenAI credentials (non‑Azure)**
+   - Copy `.env.example` to `.env`
+   - Fill in your OpenAI credentials:
    ```env
-   AZURE_OPENAI_API_KEY=your_azure_openai_api_key_here
-   AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
-   AZURE_OPENAI_API_VERSION=2024-02-15-preview
-   AZURE_OPENAI_DEPLOYMENT_NAME=your-gpt-deployment-name
-   AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=your-embedding-deployment-name
+   OPENAI_API_KEY=sk-...
+   OPENAI_MODEL_NAME=gpt-3.5-turbo
+   OPENAI_EMBEDDING_MODEL_NAME=text-embedding-3-small
+   OPENAI_TEMPERATURE=0.2
    ```
 
 4. **Run the application**
@@ -80,7 +111,7 @@ An intelligent document processing and chat system that allows you to upload PDF
 - **Frontend**: Streamlit
 - **Document Processing**: LangChain, PyPDF2, BeautifulSoup4
 - **Vector Database**: ChromaDB
-- **AI/ML**: Azure OpenAI (GPT + Embeddings)
+- **AI/ML**: OpenAI (GPT + Embeddings)
 - **Data Processing**: Pandas, NumPy
 
 ## 📖 Usage Guide
@@ -110,11 +141,10 @@ An intelligent document processing and chat system that allows you to upload PDF
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `AZURE_OPENAI_API_KEY` | Your Azure OpenAI API key | Yes |
-| `AZURE_OPENAI_ENDPOINT` | Your Azure OpenAI endpoint URL | Yes |
-| `AZURE_OPENAI_API_VERSION` | API version (default: 2024-02-15-preview) | No |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | GPT model deployment name | Yes |
-| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME` | Embeddings model deployment name | Yes |
+| `OPENAI_API_KEY` | Your OpenAI API key | Yes |
+| `OPENAI_MODEL_NAME` | Chat model (e.g., gpt-3.5-turbo) | Yes |
+| `OPENAI_EMBEDDING_MODEL_NAME` | Embedding model (e.g., text-embedding-3-small) | Yes |
+| `OPENAI_TEMPERATURE` | Sampling temperature (e.g., 0.2) | No |
 
 ### Customization
 
@@ -153,7 +183,8 @@ ai-knowledge-vault/
 ├── config.py              # Configuration settings
 ├── requirements.txt       # Python dependencies
 ├── env_example.txt        # Environment variables template
-└── README.md              # This file
+├── .env.example          # Environment variables template (no secrets)
+└── README.md             # This file
 ```
 
 ### Adding New Features
@@ -202,4 +233,4 @@ For support, please open an issue in the repository or contact the development t
 
 ---
 
-**Built with ❤️ using Streamlit, LangChain, ChromaDB, and Azure OpenAI**
+**Built with ❤️ using Streamlit, LangChain, ChromaDB, and OpenAI**

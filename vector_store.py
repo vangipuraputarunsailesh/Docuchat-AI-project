@@ -6,6 +6,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from typing import List, Optional
 import streamlit as st
+import traceback
 from config import (
     OPENAI_API_KEY,
     OPENAI_EMBEDDING_MODEL_NAME,
@@ -54,15 +55,18 @@ class VectorStore:
             if not self.vectorstore:
                 if not self.initialize_vectorstore():
                     return False
-            
-            # Add documents to vector store
-            self.vectorstore.add_documents(documents)
+
+            self.vectorstore.add_documents(documents or [])
             return True
-            
-        except Exception as e:
-            st.error(f"Error adding documents to vector store: {str(e)}")
+        except Exception:
+            tb = traceback.format_exc()
+            print("Error adding documents to vector store:\n", tb)
+            try:
+                st.error(f"Error adding documents to vector store: {tb}")
+            except Exception:
+                pass
             return False
-    
+
     def similarity_search(self, query: str, k: int = 5) -> List[Document]:
         """Perform similarity search and return relevant documents."""
         try:

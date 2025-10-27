@@ -1,0 +1,25 @@
+# Prevent copying unnecessary files into the image
+.git
+.gitignore
+.DS_Store
+.env
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Runtime artifacts
+chroma_db/
+chat_memory.json
+*.sqlite3
